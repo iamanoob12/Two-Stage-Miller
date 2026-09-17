@@ -1,16 +1,18 @@
 # Miller-Compensated Two-Stage Amplifier
 
-Ngspice simulations of a MOS common-source stage, a differential-pair OTA, and a two-stage amplifier with Miller compensation. The circuits use the SKY130A 1.8 V transistor models.
+Ngspice simulations of a MOS common-source stage, a differential-pair OTA, and a
+two-stage amplifier with Miller compensation. The circuits use the SKY130A 1.8 V
+transistor models.
 
 ## Repository layout
 
-| Path | Description |
-| --- | --- |
-| `CS_stage/cs_stage.spice` | Common-source stage with a PMOS active load and NMOS current-source load. Reports the PMOS drain current, transconductance, and output conductance. |
-| `OTA/ota.spice` | Differential-pair OTA with a PMOS current-mirror load, a 2 pF compensation capacitor, and an NMOS current-source load. Estimates output resistance from the device conductances. |
-| `Two_Stage/main.spice` | Complete two-stage amplifier. The OTA drives a common-source second stage with a feed-forward zero network and capacitive loading. Measures gain-bandwidth and phase margin. |
-| `Two_Stage/Result/Result.png` | Saved AC Bode plot of the two-stage amplifier. |
-| `Two_Stage/Result/Two_stage_ota.png` | Circuit diagram of the two-stage amplifier. |
+| Path                                 | Description                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CS_stage/cs_stage.spice`            | Common-source stage with a PMOS active load and NMOS current-source load. Reports the PMOS drain current, transconductance, and output conductance.                              |
+| `OTA/ota.spice`                      | Differential-pair OTA with a PMOS current-mirror load, a 2 pF compensation capacitor, and an NMOS current-source load. Estimates output resistance from the device conductances. |
+| `Two_Stage/main.spice`               | Complete two-stage amplifier. The OTA drives a common-source second stage with a feed-forward zero network and capacitive loading. Measures gain-bandwidth and phase margin.     |
+| `Two_Stage/Result/Result.png`        | Saved AC Bode plot of the two-stage amplifier.                                                                                                                                   |
+| `Two_Stage/Result/Two_stage_ota.png` | Circuit diagram of the two-stage amplifier.                                                                                                                                      |
 
 ## Requirements
 
@@ -18,15 +20,16 @@ Ngspice simulations of a MOS common-source stage, a differential-pair OTA, and a
 - The SKY130A PDK with the `sky130.lib.spice` model library
 - `PDK_ROOT` set to the directory containing the PDK
 
-The netlists load the typical-corner model with:
+The netlists load the typical-process, typical-voltage, typical-temperature (TT)
+model corner with:
 
-```spice
+```
 .lib "$PDK_ROOT/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
 ```
 
 For example, set the PDK path before running a simulation:
 
-```bash
+```
 export PDK_ROOT=/path/to/pdk
 ```
 
@@ -34,7 +37,7 @@ export PDK_ROOT=/path/to/pdk
 
 Run a deck interactively from its directory:
 
-```bash
+```
 cd ./CS_stage
 ngspice cs_stage.spice
 
@@ -47,32 +50,354 @@ ngspice main.spice
 
 For a non-interactive run, write the console output to a file:
 
-```bash
+```
 ngspice -b -o Two_Stage/Result/main.log Two_Stage/main.spice
 ```
 
-The two-stage deck opens an AC plot when run interactively. Its control block sweeps from 1 Hz to 10 GHz and prints:
+The two-stage deck opens an AC plot when run interactively. Its control block sweeps
+from 1 Hz to 10 GHz and prints the following measurements:
 
-- `gbw_freq`: first frequency where the output magnitude crosses 0 dB
-- `phase_at_gbw`: output phase at that crossing
-- `pm`: the reported phase value at the gain-bandwidth frequency
+- `gbw_freq`: the first frequency at which the output magnitude crosses 0 dB
+- `phase_at_gbw`: the output phase at that frequency
+- `pm`: the phase margin calculated from the crossing phase
 
 ## Circuit notes
 
 The complete amplifier is assembled from two subcircuits:
 
-1. `OTA`: a PMOS current-mirror-loaded differential pair with a 2 pF compensation capacitor.
-2. `CSstage`: a PMOS common-source stage with a 9 kOhm and 2 pF feed-through network, plus a 5 pF output load.
+1. `OTA`: a PMOS current-mirror-loaded differential pair with a 2 pF compensation
+   capacitor.
+2. `CSstage`: a PMOS common-source stage with a 9 kOhm and 2 pF feed-through
+   network, plus a 5 pF output load.
 
-The supply is 1.8 V. The OTA inputs are biased at 1 V with equal and opposite small-signal AC amplitudes (`+0.5` and `-0.5`), and the nominal tail/load current is 75 uA.
+The supply voltage is 1.8 V. The OTA inputs are biased at 1 V with equal and
+opposite small-signal AC amplitudes (`+0.5` and `-0.5`). The nominal tail and load
+current is 75 uA.
 
 ## Circuit
-![Two-stage amplifier circuit diagram](Two_Stage/Result/Two_stage_ota.png)
 
-The amplifier operates from a 1.8 V supply (`VDD`) with an input common-mode voltage (`VICM`) of 1 V. The bias voltages `Vb1` and `Vb2` are generated by current mirrors set to 20 uA and 75 uA, respectively.
+![Two-stage amplifier circuit diagram](https://github.com/iamanoob12/Two-Stage-Miller/raw/main/Two_Stage/Result/Two_stage_ota.png)
+
+The amplifier operates from a 1.8 V supply (`VDD`) with an input common-mode voltage
+(`VICM`) of 1 V. The bias voltages `Vb1` and `Vb2` are generated by current mirrors
+set to 20 uA and 75 uA, respectively.
+
+## Design methodology
+
+The target specifications were defined first. Component values were then derived
+by hand, devices were sized in SKY130, and the results were verified in simulation.
+
+### Target specification
+
+| Spec                    | Target       |
+| ------------------------ | ------------ |
+| Supply `VDD`             | 1.8 V        |
+| DC Gain                  | ≥ 60 dB      |
+| GBW                      | ≥ 10 MHz     |
+| Phase margin             | ≥ 60°        |
+| Load capacitance `CL`    | 5 pF         |
+| Slew rate                | ≥ 10 V/µs    |
+| Power                    | ≤ 1 mW       |
+
+### Step 1 — Compensation capacitor
+
+The compensation capacitor was chosen as a fraction of the load capacitance to
+provide adequate pole splitting:
+
+$$
+C_c \geq (0.2\text{--}0.3)C_L \quad\Longrightarrow\quad C_c = 2\,\mathrm{pF}
+$$
+
+### Step 2 — First-stage transconductance from GBW
+
+For a dominant-pole, Miller-compensated two-stage amplifier, the gain-bandwidth
+product reduces to a first-stage-only expression. The second-stage gain cancels
+between the DC-gain term and the Miller-multiplied dominant-pole term:
+
+$$
+\mathrm{GBW} = \frac{g_{m1}}{2\pi C_c}
+$$
+
+$$
+g_{m1} = 2\pi\,\mathrm{GBW}\,C_c
+  = 2\pi(10\,\mathrm{MHz})(2\,\mathrm{pF})
+  \approx 126\,\mu\mathrm{S}
+$$
+
+### Step 3 — Tail current from slew rate
+
+$$
+\mathrm{SR} = \frac{I_{SS}}{C_c}
+$$
+
+$$
+I_{SS} = \mathrm{SR}\,C_c
+  = (10\,\mathrm{V}/\mu\mathrm{s})(2\,\mathrm{pF})
+  = 20\,\mu\mathrm{A},
+\qquad I_{D1} = \frac{I_{SS}}{2} = 10\,\mu\mathrm{A}
+$$
+
+The resulting ratio is
+
+$$
+\frac{g_{m1}}{I_{D1}} = \frac{126\,\mu\mathrm{S}}{10\,\mu\mathrm{A}}
+\approx 12.6\,\mathrm{V}^{-1},
+$$
+
+which indicates moderate inversion and provides a reasonable starting point for
+the SKY130 $g_m/I_D$ lookup curve.
+
+### Step 4 — Second-stage transconductance from phase margin
+
+For a phase margin of at least 60 degrees, with the compensation zero nulled or
+placed usefully, a suitable design rule is:
+
+$$
+f_{p2} \geq 2.2\,\mathrm{GBW}
+$$
+
+$$
+g_{m2} \geq 2.2\,(2\pi\,\mathrm{GBW})C_L
+  = 2.2\,g_{m1}\frac{C_L}{C_c}
+$$
+
+$$
+g_{m2} \geq 2.2(126\,\mu\mathrm{S})\frac{5\,\mathrm{pF}}{2\,\mathrm{pF}}
+  \approx 693\,\mu\mathrm{S}
+\quad\Longrightarrow\quad g_{m2}=1\,\mathrm{mS}\ \text{was chosen}
+$$
+
+### Step 5 — Second-stage bias current
+
+Targeting $g_m/I_D \approx 10\,\mathrm{V}^{-1}$ places the output stage in
+stronger inversion, favoring speed over noise:
+
+$$
+I_{D2} = \frac{g_{m2}}{10\,\mathrm{V}^{-1}} = 75\,\mu\mathrm{A}
+$$
+
+Slew-rate check at the output node:
+
+$$
+\mathrm{SR}_2 = \frac{I_{D2}}{C_L}
+              = \frac{75\,\mu\mathrm{A}}{5\,\mathrm{pF}}
+              = 15\,\mathrm{V}/\mu\mathrm{s}
+              > 10\,\mathrm{V}/\mu\mathrm{s}
+$$
+
+### Step 6 — Power check
+
+$$
+P = (I_{SS}+I_{D2})V_{DD}
+  = (20\,\mu\mathrm{A}+75\,\mu\mathrm{A})(1.8\,\mathrm{V})
+  \approx 171\,\mu\mathrm{W}
+  \leq 1\,\mathrm{mW}
+$$
+
+### Step 7 — Nulling / feed-through resistor
+
+$$
+R_z \approx \frac{1}{g_{m2}}
+  = \frac{1}{750\,\mu\mathrm{S}}
+  \approx 1.33\,\mathrm{k}\Omega
+$$
+
+The final design uses a value somewhat greater than $1/g_{m2}$ (see the zero
+derivation below) to place the feed-through zero in the left half-plane rather
+than canceling it exactly.
+
+## Full transfer function and pole/zero derivation
+
+The OTA output node and the CS-stage feed-through path were analyzed together in a
+single loop equation rather than by assuming the simplified single-pole Miller
+formula. The resulting closed-form transfer function is:
+
+$$
+\frac{v_{out}}{v_{in}}
+= \frac{-g_m r_0 Z_f+r_0}
+{(r_0+Z_f)\left(g_m+\frac{1}{R_{out1}}+C_c s\right)-g_m Z_f+1}
+$$
+
+Starting from Kirchhoff's current law (KCL) at the amplifier output node, the same
+result follows step by step:
+
+$$
+i_1=i_2+i_3
+$$
+
+$$
+i_2=-g_m v_1+\frac{v_{out}}{r_0}
+  =\frac{-v_1-v_{out}}{Z_f}
+$$
+
+$$
+i_3=-v_1 C_c s,
+\qquad
+i_1=\frac{v_{in}+v_1}{R_{out}}
+$$
+
+Eliminating `i` and `v1` gives:
+
+$$
+\frac{v_{out}}{v_{in}}=\frac{r_0(1-g_m Z_f)}{D(s)}
+$$
+
+where the full denominator, including the first-stage output resistance $R_{out1}$
+and the compensation capacitor $C_c$ at the internal node, is:
+
+$$
+D(s)=(r_0+Z_f)\left(g_m+\frac{1}{R_{out1}}+C_c s\right)-g_m Z_f+1
+$$
+
+### How the zero is found
+
+A zero of the transfer function occurs wherever its **numerator** equals zero.
+This condition is independent of the denominator, regardless of its complexity:
+
+$$
+r_0(1-g_m Z_f)=0
+\quad\Longrightarrow\quad
+Z_f=\frac{1}{g_m}
+$$
+
+Substituting $Z_f=R_z+1/(C_f s)$ and solving for $s$ gives:
+
+$$
+s_z=\frac{g_m}{C_f(1-g_m R_z)}
+$$
+
+- $g_mR_z<1$: the zero is in the **right half-plane** and adds phase lag.
+- $g_mR_z=1$: the zero is pushed to infinity, corresponding to classic
+  nulling-resistor cancellation.
+- $g_mR_z>1$: the zero is in the **left half-plane** and adds phase lead. This is
+  the condition used here to offset the second pole's lag near crossover.
+
+Solving for $R_z$ at a target zero frequency $f_z$, given a fixed $C_f$, gives:
+
+$$
+R_z=\frac{1}{g_m}+\frac{1}{2\pi f_z C_f}
+$$
+
+For $g_m=1\,\mathrm{mS}$, $C_f=2\,\mathrm{pF}$, and a target of
+$f_z=10\,\mathrm{MHz}$:
+
+$$
+R_z=1000+\frac{1}{2\pi(10\,\mathrm{MHz})(2\,\mathrm{pF})}
+\approx 8.96\,\mathrm{k}\Omega
+$$
+
+### How the poles are found
+
+Poles come from the **denominator**. Expanding $D(s)$, the $g_mZ_f$ cross terms
+cancel exactly. Substituting $Z_f=R_z+1/(C_f s)$ and multiplying through by $s$
+gives the quadratic:
+
+$$
+D'(s)=a_2s^2+a_1s+a_0
+$$
+
+$$
+a_2=C_c(r_0+R_z)
+$$
+
+$$
+a_1=r_0g_m+\frac{r_0}{R_{out1}}+1+\frac{R_z}{R_{out1}}+\frac{C_c}{C_f}
+$$
+
+$$
+a_0=\frac{1}{C_fR_{out1}}
+$$
+
+The dominant and non-dominant poles follow from the standard two-pole
+approximation:
+
+$$
+f_{p1}\approx\frac{a_0}{2\pi a_1}
+\qquad\text{(dominant pole)}
+$$
+
+$$
+f_{p2}\approx\frac{a_1}{2\pi a_2}
+\qquad\text{(non-dominant pole)}
+$$
+
+Since $a_2$, $a_1$, and $a_0$ are sums of positive quantities, both roots have
+negative real parts. Thus, both poles lie in the left half-plane, consistent with
+a stable, non-oscillating amplifier.
+
+### Numeric result
+
+Using the extracted values $r_0=64.8\,\mathrm{k}\Omega$, $g_m=1\,\mathrm{mS}$,
+$R_{out1}=108.2\,\mathrm{k}\Omega$ from the first-stage OTA measurement,
+$C_c=2\,\mathrm{pF}$, $R_z=8.96\,\mathrm{k}\Omega$, and
+$C_f=2\,\mathrm{pF}$:
+
+$$
+a_2\approx1.475\times10^{-7},
+\qquad a_1\approx67.5,
+\qquad a_0\approx4.62\times10^6
+$$
+
+$$
+f_{p1}\approx10.9\,\mathrm{kHz},
+\qquad f_z\approx10\,\mathrm{MHz}\ \text{(left half-plane)},
+\qquad f_{p2}\approx72.8\,\mathrm{MHz}
+$$
+
+The resulting ordering, $f_{p1}<f_z<f_{p2}$, is the intended compensation
+structure. The dominant pole sets the initial $-20\,\mathrm{dB/decade}$ roll-off,
+the left-half-plane zero restores phase near the unity-gain crossing, and the
+non-dominant pole remains well above the crossover frequency.
 
 ## Results
 
-![Two-stage amplifier Bode plot](Two_Stage/Result/Result.png)
+![Two-stage amplifier Bode plot](https://github.com/iamanoob12/Two-Stage-Miller/raw/main/Two_Stage/Result/Result.png)
 
-The plot shows the simulated output magnitude in dB and phase in degrees. Re-run the deck after changing device sizes, compensation values, loads, or bias conditions to regenerate the measurements.
+The plot shows the simulated output magnitude in dB and phase in degrees. Re-run
+the deck after changing device sizes, compensation values, loads, or bias
+conditions to regenerate the measurements.
+
+### Specification vs. simulated result
+
+| Spec         | Target    | Simulated (with `CL` = 5 pF) |
+| ------------ | --------- | ----------------------------- |
+| DC Gain      | ≥ 60 dB   | 54.4 dB                       |
+| GBW          | ≥ 10 MHz  | 12.0 MHz                      |
+| Phase Margin | ≥ 60°     | 79.0°                         |
+| Load Cap     | 5 pF      | 5 pF                          |
+
+The GBW and phase-margin targets are both exceeded. The DC gain is approximately
+5--6 dB below the 60 dB target ($\approx 525\times$ actual gain versus
+$1000\times$ target gain). Because the phase margin has significant headroom
+(79 degrees versus a 60-degree minimum), some of that margin could be traded for
+gain, for example by increasing the channel length $L$ of the gain-stage devices
+to raise $r_0$. This change would need to be re-verified against the phase-margin
+requirement and is left as future work below.
+
+## Future work
+
+- **PSRR (power-supply rejection ratio):** not yet characterized. The planned
+  approach is to inject an AC signal on `VDD`, hold the differential inputs at
+  DC, and measure the resulting output coupling to obtain PSRR+. The same process
+  will be repeated on the ground or tail-current reference node to obtain PSRR-.
+- **ICMR (input common-mode range):** not yet verified against the NMOS input
+  pair's headroom constraints. The lower bound is estimated by
+
+  $$
+  V_{in,\min}=V_{OV,\mathrm{tail}}+V_{TH1}+V_{OV1}.
+  $$
+
+  Depending on the tail-device overdrive and the input-pair threshold voltage,
+  this lower bound may be well above the assumed 1 V common-mode bias point and
+  must be checked explicitly.
+- **DC gain:** currently 54.4 dB versus a 60 dB target. Given the available phase
+  margin headroom, increasing $L$ on the gain-stage devices to raise $r_0$ is a
+  candidate fix. GBW and phase margin should be re-verified after the change.
+- **Pole/zero cross-check:** the hand-calculated $f_{p1}$, $f_{p2}$, and $f_z$ have
+  not yet been checked against an ngspice `.pz` pole-zero analysis of the final
+  netlist. This analysis would directly validate the hand derivation against the
+  simulator's root extraction.
+
+## About
+
+Two Stage Miller with feedthrough component
