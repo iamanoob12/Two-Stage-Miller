@@ -383,9 +383,7 @@ requirement and is left as future work below.
 - **ICMR (input common-mode range):** not yet verified against the NMOS input
   pair's headroom constraints. The lower bound is estimated by
 
-  $$
-  V_{in,\min}=V_{OV,\mathrm{tail}}+V_{TH1}+V_{OV1}.
-  $$
+ $$V_{\text{in},\min} = V_{\text{OV},\text{tail}} + V_{\text{TH}1} + V_{\text{OV}1}$$
 
   Depending on the tail-device overdrive and the input-pair threshold voltage,
   this lower bound may be well above the assumed 1 V common-mode bias point and
