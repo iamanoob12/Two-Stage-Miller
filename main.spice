@@ -3,7 +3,7 @@
 .param scale_n = '10u/7.539e-5'
 .param scale_p = '10u/6.942e-6'
 
-.lib "$PDK_ROOT/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
+.lib "/usr/local/share/pdk/share/pdk/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
 
 Vdd Vdd 0 DC 1.8
 Vin_p Vin_p 0 DC 1 AC 0.5
@@ -38,6 +38,14 @@ XCS Vout1 Vout Vdd N3 CSstage
     Xp1 Vdd Vin Vout Vdd MY_PFET W_val=5*6
     Xp2 Vdd Vin Vout Vdd MY_PFET W_val=5*6
     
+
+    ***Feedthrough Branch***
+    Rz Vin N1 9k
+    Cz N1 Vout 2p
+
+    *** Cload ***
+    Cload Vout 0 5p
+
     *** LOAD ***
     Xnload Vout Vload 0 0 MY_NFET W_val=5 L_val=0.50
 .ends CSstage
@@ -66,11 +74,14 @@ XCS Vout1 Vout Vdd N3 CSstage
 .ends MY_NFET
 
 .control
-    op
-    print n1 vout1 vout
-
-    ac dec 100 1 1e9
-    set units=degrees
+    ac dec 100 1 10G
+    options units=degrees
+    meas ac gbw_freq WHEN vdb(vout)=0 cross=1
+    meas ac phase_at_gbw FIND vp(vout) WHEN vdb(vout)=0 cross=1
+    let pm = 180 + phase_at_gbw
+    print gbw_freq
+    print phase_at_gbw
+    print pm
     plot db(vout) ph(vout)
 .endc
 

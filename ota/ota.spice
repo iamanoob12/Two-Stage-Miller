@@ -3,7 +3,7 @@
 .param scale_n = '10u/7.539e-5'
 .param scale_p = '10u/6.942e-6'
 
-.lib "$PDK_ROOT/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
+.lib "/usr/local/share/pdk/share/pdk/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
 
 Vdd Vdd 0 DC 1.8
 Vin_p Vin_p 0 DC 1 AC 0.5
@@ -49,6 +49,12 @@ Xnload AC_gnd N2 0 0 MY_NFET W_val=5 L_val=0.50
 .control
     op
     print n1 vout vdd#branch
+    let gdsp = @m.xp1.xmp.msky130_fd_pr__pfet_01v8[gds]
+    let gdsn = @m.xn1.xmn.msky130_fd_pr__nfet_01v8[gds]
+
+    let rout = 1/(gdsp + gdsn)
+
+    print rout
 .endc
 
 .end
