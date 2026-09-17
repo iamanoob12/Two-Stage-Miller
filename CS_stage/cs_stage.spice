@@ -1,0 +1,47 @@
+*** bruh ***
+
+.param scale = 12
+
+.lib "$PDK_ROOT/sky130A/libs.tech/ngspice/sky130.lib.spice" tt
+
+Vdd Vdd 0 DC 1.8
+Vin Vin 0 DC 0.8
+
+Xp1 Vdd Vin Vout Vdd MY_PFET W_val=5*12 L_val=0.30
+
+*** LOAD ***
+Iss 0 Nload DC 75u
+XnMirror1 Nload Nload 0 0 MY_NFET W_val=5 L_val=0.50
+Xnload Vout Nload 0 0 MY_NFET W_val = 5 L_val=0.50
+
+*** devices ***
+.subckt MY_PFET Vs Vg Vd Vb W_val=5 L_val=0.30
+    XMP Vd Vg Vs Vb sky130_fd_pr__pfet_01v8 W='W_val' L='L_val' 
++ ad=  {int((nf+1)/2)*w/nf*0.29}
++ as=  {int((nf+2)/2)*w/nf*0.29}
++ pd=  {2*int((nf+1)/2)*(w/nf+0.29)}
++ ps=  {2*int((nf+2)/2)*(w/nf+0.29)}
++ nrd= {0.29/w}
++ nrs= {0.29/w}
++ sa = 0 sb = 0 sd = 0
+.ends MY_PFET
+
+.subckt MY_NFET Vd Vg Vs Vb W_val=5 L_val=0.15
+    XMN Vd Vg Vs Vb sky130_fd_pr__nfet_01v8 W='W_val' L='L_val' 
++ ad=  {int((nf+1)/2)*w/nf*0.29}
++ as=  {int((nf+2)/2)*w/nf*0.29}
++ pd=  {2*int((nf+1)/2)*(w/nf+0.29)}
++ ps=  {2*int((nf+2)/2)*(w/nf+0.29)}
++ nrd= {0.29/w}
++ nrs= {0.29/w}
++ sa = 0 sb = 0 sd = 0
+.ends MY_NFET
+
+.control
+    op
+    print vdd#branch
+    print @m.xp1.xmp.msky130_fd_pr__pfet_01v8[gm]
+    print @m.xp1.xmp.msky130_fd_pr__pfet_01v8[gds]
+.endc
+
+.end

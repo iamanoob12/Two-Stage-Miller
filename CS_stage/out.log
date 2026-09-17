@@ -1,0 +1,15 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: *** bruh ***
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+vdd#branch = -7.35854e-05
+@m.xp1.xmp.msky130_fd_pr__pfet_01v8[gm] = 1.004029e-03
+@m.xp1.xmp.msky130_fd_pr__pfet_01v8[gds] = 1.543210e-05
+Note: Simulation executed from .control section 
